@@ -1,0 +1,229 @@
+library(rms)
+library(PredictABEL)
+require(ModelGood)
+library(survival)
+args(coxph)
+library(riskRegression)
+library(pec)
+require(prodlim)
+library(lava)
+library(ggplot2)
+library(cowplot)
+library(Rcpp)
+library(survminer)
+library("moonBook")
+
+######################################
+############ DDx: Amyloid ############
+######################################
+LVH_CMR_DDx_20231217 <-read.csv("C:/Users/LVH_CMR_DDx_20231217_R.csv")
+
+library(cutpointr)
+ECV_DDx_Amyloid <- cutpointr(LVH_CMR_DDx_20231217, ECV, Dx_Amyloid, 
+                method = maximize_metric, metric = sum_sens_spec)
+summary(ECV_DDx_Amyloid)
+plot(ECV_DDx_Amyloid)
+
+
+T1_DDx_Amyloid <- cutpointr(LVH_CMR_DDx_20231217, Native_T1, Dx_Amyloid, 
+                             method = maximize_metric, metric = sum_sens_spec)
+summary(T1_DDx_Amyloid)
+plot(T1_DDx_Amyloid)
+
+##################
+
+library(plotROC)
+library(pROC)
+roc_ECV <- plot.roc(LVH_CMR_DDx_20231217$Dx_Amyloid, LVH_CMR_DDx_20231217$ECV, main="Statistical comparison", percent=TRUE, col="#2E9FDF")
+roc_native_T1 <- lines.roc(LVH_CMR_DDx_20231217$Dx_Amyloid, LVH_CMR_DDx_20231217$Native_T1, percent=TRUE, col="coral1")
+test_DDx_Amyloid <- roc.test(roc_ECV, roc_native_T1)
+text(20, 20, labels=paste("p-value =", format.pval(test_DDx_Amyloid$p.value)), adj=c(0, .5))
+legend("bottomright", legend=c("ECV", "Native T1"), col=c("#2E9FDF", "coral1"), lwd=2)
+
+
+#########################################
+############### KM curves ###############
+#########################################
+
+Amyloid_20231217 <-read.csv("C:/Users/Amyloidosis_Data_20231217_R.csv")
+
+fit_r_mayo <-survfit(Surv(FU_comp_CV_HHF,Comp_CV_death_HHF)~r_Mayo_stage, data=Amyloid_20231217)
+ggsurvplot(fit_r_mayo, title="CV death + HF hospitalization",
+           risk.table=TRUE,
+           legend="right", legend.labs=c("r-Mayo stage III", "r- Mayo stage IV"),
+           conf.int=F, palette = c("#2E9FDF", "coral1"),
+           xlim=c(0,60), break.time.by=12, xlab="Follow-up duration (months)",
+           ylim=c(0,1), break.by=0.2)
+
+
+fit_proBNP <-survfit(Surv(FU_comp_CV_HHF,Comp_CV_death_HHF)~NTproBNP_1800, data=Amyloid_20231217)
+ggsurvplot(fit_proBNP, title="CV death + HF hospitalization",
+           risk.table=TRUE,
+           legend="right", legend.labs=c("NTproBNP <1800", "NTproBNP >=1800"),
+           conf.int=F, palette = c("#2E9FDF", "coral1"),
+           xlim=c(0,60), break.time.by=12, xlab="Follow-up duration (months)",
+           ylim=c(0,1), break.by=0.2)
+
+
+fit_d_FLC <-survfit(Surv(FU_comp_CV_HHF,Comp_CV_death_HHF)~dFLC_180, data=Amyloid_20231217)
+ggsurvplot(fit_d_FLC, title="CV death + HF hospitalization",
+           risk.table=TRUE,
+           legend="right", legend.labs=c("delta FLC <180", "delta FLC >=180"),
+           conf.int=F, palette = c("#2E9FDF", "coral1"),
+           xlim=c(0,60), break.time.by=12, xlab="Follow-up duration (months)",
+           ylim=c(0,1), break.by=0.2)
+
+
+fit_ECV_40 <-survfit(Surv(FU_comp_CV_HHF,Comp_CV_death_HHF)~ECV_40, data=Amyloid_20231217)
+ggsurvplot(fit_ECV_40, title="CV death + HF hospitalization",
+           risk.table=TRUE,
+           legend="right", legend.labs=c("ECV <40%", "ECV >=40%"),
+           conf.int=F, palette = c("#2E9FDF", "coral1"),
+           xlim=c(0,60), break.time.by=12, xlab="Follow-up duration (months)",
+           ylim=c(0,1), break.by=0.2)
+
+fit_ECV_40_Mayo <-survfit(Surv(FU_comp_CV_HHF,Comp_CV_death_HHF)~r_Mayo_ECV_40_by4, data=Amyloid_20231217)
+ggsurvplot(fit_ECV_40_Mayo, title="CV death + HF hospitalization",
+           risk.table=TRUE,
+           legend="right", legend.labs=c("r-Mayo III, ECV <40%", "r-Mayo IV, ECV <40%", "r-Mayo III, ECV >=40%", "r-Mayo IV, ECV >=40%"),
+           conf.int=F, palette = c("#2E9FDF", "green3","darkorange", "coral1"),
+           xlim=c(0,60), break.time.by=12, xlab="Follow-up duration (months)",
+           ylim=c(0,1), break.by=0.2)
+
+####################################################
+#################### IDI, NRI ######################
+####################################################
+
+
+library('survIDINRI')
+library('survivalROC')
+library('pROC')
+
+Amyloid_IDI_NRI_ROC <-read.csv("C:/Users/Amyloidosis_IDI_NRI_20240130_R.csv")
+
+# pROC - Native T1 vs. ECV
+roc1 <- roc(Amyloid_IDI_NRI_ROC$Comp_CV_death_HHF, Amyloid_IDI_NRI_ROC$Native_T1)
+roc2 <- roc(Amyloid_IDI_NRI_ROC$Comp_CV_death_HHF, Amyloid_IDI_NRI_ROC$ECV)
+roc.test(roc1, roc2, method="delong")
+
+roc.test(roc1, roc2)
+plot (roc1, col=2, lty=1, main="ROC")
+plot (roc2, col=4, lty=1, add = TRUE)
+
+# pROC - ECV+Mayo vs. Mayo
+roc3 <- roc(Amyloid_IDI_NRI_ROC$Comp_CV_death_HHF, Amyloid_IDI_NRI_ROC$r_Mayo_stage)
+roc4 <- roc(Amyloid_IDI_NRI_ROC$Comp_CV_death_HHF, Amyloid_IDI_NRI_ROC$r_Mayo_ECV_40_by4)
+roc3
+ci(roc3)
+roc4
+ci(roc4)
+roc.test(roc3, roc4, method="delong")
+
+roc.test(roc3, roc4)
+plot (roc3, col=2, lty=1, main="ROC")
+plot (roc4, col=4, lty=1, add = TRUE)
+
+### show binormal curve fit.
+
+roc.plot(A$event, A$p2, binormal = TRUE)
+
+# not worked
+t.ROC<-survivalROC(Stime=Amyloid_IDI_NRI_ROC$FU_comp_CV_HHF, status=Amyloid_IDI_NRI_ROC$Comp_CV_death_HHF, marker=cox.lp, predict.time=365.25, method="KM")
+
+# Categorical NRI
+Surv.obj<-Surv(time=Amyloid_IDI_NRI_ROC$FU_comp_CV_HHF, event=Amyloid_IDI_NRI_ROC$Comp_CV_death_HHF==1)
+yy<-cbind(Amyloid_IDI_NRI_ROC$FU_comp_CV_HHF, as.double(as.character(Amyloid_IDI_NRI_ROC$Comp_CV_death_HHF)))
+xx0<-model.matrix(~r_Mayo_stage, data=Amyloid_IDI_NRI_ROC)[, -1]
+xx1<-model.matrix(~r_Mayo_ECV_40_by4, data=Amyloid_IDI_NRI_ROC)[, -1]
+obj<-IDI.INF(indata=yy, covs0=xx0, covs1=xx1, t0=2, seed1=120)
+IDI.INF.OUT(obj)
+
+# IDI
+Surv.obj<-Surv(time=Amyloid_IDI_NRI_ROC$FU_comp_CV_HHF, event=Amyloid_IDI_NRI_ROC$Comp_CV_death_HHF==1)
+yy<-cbind(Amyloid_IDI_NRI_ROC$FU_comp_CV_HHF, as.double(as.character(Amyloid_IDI_NRI_ROC$Comp_CV_death_HHF)))
+xx0<-model.matrix(~r_Mayo_stage, data=Amyloid_IDI_NRI_ROC)[, -1]
+xx1<-model.matrix(~r_Mayo_stage + ECV_40, data=Amyloid_IDI_NRI_ROC)[, -1]
+obj<-IDI.INF(indata=yy, covs0=xx0, covs1=xx1, t0=2, seed1=120)
+IDI.INF.OUT(obj)
+
+
+# IDI
+Surv.obj<-Surv(time=Amyloid_IDI_NRI_ROC$FU_comp_CV_HHF, event=Amyloid_IDI_NRI_ROC$Comp_CV_death_HHF==1)
+yy<-cbind(Amyloid_IDI_NRI_ROC$FU_comp_CV_HHF, as.double(as.character(Amyloid_IDI_NRI_ROC$Comp_CV_death_HHF)))
+xx0<-model.matrix(~r_Mayo_stage, data=Amyloid_IDI_NRI_ROC)[, -1]
+xx1<-model.matrix(~r_Mayo_stage + ECV, data=Amyloid_IDI_NRI_ROC)[, -1]
+obj<-IDI.INF(indata=yy, covs0=xx0, covs1=xx1, t0=5, seed1=100)
+IDI.INF.OUT(obj)
+
+
+########################################
+############## Box plots ###############
+########################################
+library(ggplot2)
+
+LVH_CMR_DDx_20240308 <-read.csv("C:/Users/LVH_CMR_DDx_20240314_R.csv")
+LVH_CMR_DDx_20240308$Group_1 <- as.factor(LVH_CMR_DDx_20240308$Group_1)
+head(LVH_CMR_DDx_20240308)
+
+# Basic box plot
+bp_Native_T1 <- ggplot(LVH_CMR_DDx_20240308, aes(x=Group_1, y=Native_T1, fill=Group_1)) + 
+  geom_boxplot(outlier.shape=NA)+
+  labs(title="Native T1 according to LVH etiologies",x="Etiologies of LVH", y = "Native T1 (msec)")
+bp_Native_T1 + scale_x_discrete(limits=c("HHD","HCM","CA", "Fabry"))  + scale_fill_brewer(palette="Dark2") + theme_bw()
+bp_Native_T1 + scale_x_discrete(limits=c("HHD","HCM","CA", "Fabry"))  + scale_fill_brewer(palette="Blues") + theme_bw()
+
+bp_ECV <- ggplot(LVH_CMR_DDx_20240308, aes(x=Group_1, y=ECV, fill=Group_1)) + 
+  geom_boxplot(outlier.shape=NA)+
+  labs(title="ECV according to LVH etiologies",x="Etiologies of LVH", y = "ECV (%)")
+bp_ECV + scale_x_discrete(limits=c("HHD","HCM","CA", "Fabry"))  + scale_fill_brewer(palette="Dark2") + theme_bw()
+bp_ECV + scale_x_discrete(limits=c("HHD","HCM","CA", "Fabry"))  + scale_fill_brewer(palette="Blues") + theme_bw()
+
+
+###############################
+############# ROC #############
+###############################
+library(ggplot2)
+library(cutpointr)
+library(plotROC)
+library(pROC)
+
+
+Amyloid_20231217 <-read.csv("C:/Users/Amyloidosis_Data_20231217_R.csv")
+
+cp <- cutpointr(Amyloid_20231217, ECV, Comp_CV_death_HHF, 
+                method = maximize_metric, metric = sum_sens_spec)
+summary(cp)
+plot(cp)
+
+rocobj1 <- plot.roc(Amyloid_20231217$Comp_CV_death_HHF, Amyloid_20231217$r_Mayo_ECV_40_by4, main="ROC comparison", percent=TRUE, col="#2E9FDF")
+rocobj2 <- lines.roc(Amyloid_20231217$Comp_CV_death_HHF, Amyloid_20231217$r_Mayo_stage, percent=TRUE, col="coral1")
+testobj <- roc.test(rocobj1, rocobj2)
+text(20, 15, labels=paste("p-value =", format.pval(testobj$p.value)), adj=c(0, .5))
+legend("bottomright", legend=c("revised Mayo stage","rMayo + ECV 40%"), col=c("coral1", "#2E9FDF"), lwd=2)
+
+T1_DDx_Amyloid <- cutpointr(LVH_CMR_DDx_20240311, Native_T1, Dx_Amyloid, 
+                            method = maximize_metric, metric = sum_sens_spec)
+summary(T1_DDx_Amyloid)
+plot(T1_DDx_Amyloid)
+
+roc_ECV <- plot.roc(LVH_CMR_DDx_20240311$Dx_Amyloid, LVH_CMR_DDx_20240311$ECV, main="ROC comparison", percent=TRUE, col="#2E9FDF")
+roc_native_T1 <- lines.roc(LVH_CMR_DDx_20240311$Dx_Amyloid, LVH_CMR_DDx_20240311$Native_T1, percent=TRUE, col="coral1")
+test_DDx_Amyloid <- roc.test(roc_ECV, roc_native_T1)
+text(20, 15, labels=paste("p-value =", format.pval(test_DDx_Amyloid$p.value)), adj=c(0, .5))
+legend("bottomright", legend=c("ECV", "Native T1"), col=c("#2E9FDF", "coral1"), lwd=2)
+
+
+
+#######################################
+########## KM curves in ATTR ##########
+#######################################
+
+ATTR_20241130 <-read.csv("C:/Users/ATTR_list_20241130.csv")
+
+fit_ECV_40 <-survfit(Surv(FU_comp_CV_HHF,Comp_CV_death_HHF)~ECV_40, data=ATTR_20241130)
+ggsurvplot(fit_ECV_40, title="CV death + HF hospitalization",
+           risk.table=TRUE, risk.table.y.text = FALSE,
+           legend="right", legend.labs=c("ECV <40%", "ECV ≥40%"),
+           conf.int=F, palette = c("#2E9FDF", "coral1"),
+           xlim=c(0,60), break.time.by=12, xlab="Follow-up duration (months)",
+           ylim=c(0,1), break.by=0.2)
